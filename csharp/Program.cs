@@ -49,65 +49,70 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
     // Create an array to store all of the related posts.
     var allRelatedPosts = new RelatedPosts[postsCount];
     var taggedPostCount = new byte[postsCount];
-    Span<(byte Count, int PostId)> top5 = new (byte Count, int PostId)[topN];
+    var top5 = new (byte Count, int PostId)[topN];
 
     // Iterate over all of the posts.
     for (var i = 0; i < postsCount; i++)
     {
-        // Reset the tagged post counts.
-        ((Span<byte>)taggedPostCount).Fill(0);
+        allRelatedPosts[i] = GetRelatedPosts(i);
 
-        // Iterate over all of the tags for the current post.
-        foreach (var tag in posts[i].Tags)
+        RelatedPosts GetRelatedPosts(int postIndex)
         {
-            // Iterate over all of the related post IDs for the current tag.
-            foreach (var otherPostIdx in tagMap[tag])
+            // Reset the tagged post counts.
+            ((Span<byte>)taggedPostCount).Fill(0);
+
+            // Iterate over all of the tags for the current post.
+            foreach (var tag in posts[postIndex].Tags)
             {
-                // Increment the tagged post count for the related post.
-                taggedPostCount[otherPostIdx]++;
-            }
-        }
-
-        taggedPostCount[i] = 0; // don't count self
-        top5.Clear();
-        byte minTags = 0;
-
-        //  custom priority queue to find top N
-        for (var j = 0; j < postsCount; j++)
-        {
-            byte count = taggedPostCount[j];
-
-            if (count > minTags)
-            {
-                int upperBound = topN - 2;
-
-                while (upperBound >= 0 && count > top5[upperBound].Count)
+                // Iterate over all of the related post IDs for the current tag.
+                foreach (var otherPostIdx in tagMap[tag])
                 {
-                    top5[upperBound + 1] = top5[upperBound];
-                    upperBound--;
+                    // Increment the tagged post count for the related post.
+                    taggedPostCount[otherPostIdx]++;
                 }
-
-                top5[upperBound + 1] = (count, j);
-
-                minTags = top5[topN - 1].Count;
             }
+
+            taggedPostCount[postIndex] = 0; // don't count self
+            ((Span<(byte, int)>)top5).Clear();
+            byte minTags = 0;
+
+            //  custom priority queue to find top N
+            for (var j = 0; j < postsCount; j++)
+            {
+                byte count = taggedPostCount[j];
+
+                if (count > minTags)
+                {
+                    int upperBound = topN - 2;
+
+                    while (count > top5[upperBound].Count)
+                    {
+                        top5[upperBound + 1] = top5[upperBound];
+                        if (upperBound-- == 0)
+                            break; ;
+                    }
+
+                    top5[upperBound + 1] = (count, j);
+
+                    minTags = top5[topN - 1].Count;
+                }
+            }
+
+            var topPosts = new Post[topN];
+
+            // Convert indexes back to Post references. skip even indexes
+            for (int j = 0; j < 5; j++)
+            {
+                topPosts[j] = posts[top5[j].PostId];
+            }
+
+            return new RelatedPosts
+            {
+                Id = posts[i].Id,
+                Tags = posts[i].Tags,
+                Related = topPosts
+            };
         }
-
-        var topPosts = new Post[topN];
-
-        // Convert indexes back to Post references. skip even indexes
-        for (int j = 0; j < 5; j++)
-        {
-            topPosts[j] = posts[top5[j].PostId];
-        }
-
-        allRelatedPosts[i] = new RelatedPosts
-        {
-            Id = posts[i].Id,
-            Tags = posts[i].Tags,
-            Related = topPosts
-        };
-
     }
     return allRelatedPosts;
 }
