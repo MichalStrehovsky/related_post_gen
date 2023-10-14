@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -26,7 +27,7 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
     var postsCount = posts.Count;
 
     // Create a dictionary to map tags to post IDs.
-    var tagMapTemp = new Dictionary<string, LinkedList<int>>(100);
+    var tagMapTemp = new Dictionary<Utf8String, LinkedList<int>>(100);
 
     for (var i = 0; i < postsCount; i++)
     {
@@ -39,7 +40,7 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
         }
     }
 
-    var tagMap = new Dictionary<string, int[]>(tagMapTemp.Count);
+    var tagMap = new Dictionary<Utf8String, int[]>(tagMapTemp.Count);
 
     foreach (var (tag, postIds) in tagMapTemp)
     {
@@ -112,6 +113,33 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
     return allRelatedPosts;
 }
 
+class Utf8StringConverter : JsonConverter<Utf8String>
+{
+    public override Utf8String Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => new Utf8String(reader.ValueSpan.ToArray());
+
+    public override void Write(Utf8JsonWriter writer, Utf8String value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value.Bytes);
+}
+
+[JsonConverter(typeof(Utf8StringConverter))]
+public struct Utf8String : IEquatable<Utf8String>
+{
+    private byte[] _bytes;
+
+    public ReadOnlySpan<byte> Bytes => _bytes;
+
+    public Utf8String(byte[] bytes) => _bytes = bytes;
+
+    public override int GetHashCode()
+    {
+        HashCode hash = default;
+        hash.AddBytes(_bytes);
+        return hash.ToHashCode();
+    }
+    public override bool Equals([NotNullWhen(true)] object? obj) => obj is Utf8String other && Equals(other);
+    public bool Equals(Utf8String other) => ((Span<byte>)_bytes).SequenceEqual((Span<byte>)other._bytes);
+}
 
 public record struct Post
 {
@@ -122,7 +150,7 @@ public record struct Post
     public string Title { get; set; }
 
     [JsonPropertyName("tags")]
-    public string[] Tags { get; set; }
+    public Utf8String[] Tags { get; set; }
 }
 
 public record RelatedPosts
@@ -131,7 +159,7 @@ public record RelatedPosts
     public string Id { get; set; }
 
     [JsonPropertyName("tags")]
-    public string[] Tags { get; set; }
+    public Utf8String[] Tags { get; set; }
 
     [JsonPropertyName("related")]
     public Post[] Related { get; set; }
