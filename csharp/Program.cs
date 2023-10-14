@@ -54,9 +54,9 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
     // Iterate over all of the posts.
     for (var i = 0; i < postsCount; i++)
     {
-        allRelatedPosts[i] = GetRelatedPosts(i);
+        allRelatedPosts[i] = GetRelatedPosts(i, taggedPostCount, posts, tagMap, top5);
 
-        RelatedPosts GetRelatedPosts(int postIndex)
+        static RelatedPosts GetRelatedPosts(int postIndex, byte[] taggedPostCount, List<Post> posts, Dictionary<string, int[]> tagMap, (byte Count, int PostId)[] top5)
         {
             // Reset the tagged post counts.
             ((Span<byte>)taggedPostCount).Fill(0);
@@ -77,7 +77,7 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
             byte minTags = 0;
 
             //  custom priority queue to find top N
-            for (var j = 0; j < postsCount; j++)
+            for (var j = 0; j < taggedPostCount.Length; j++)
             {
                 byte count = taggedPostCount[j];
 
@@ -108,8 +108,8 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
 
             return new RelatedPosts
             {
-                Id = posts[i].Id,
-                Tags = posts[i].Tags,
+                Id = posts[postIndex].Id,
+                Tags = posts[postIndex].Tags,
                 Related = topPosts
             };
         }
