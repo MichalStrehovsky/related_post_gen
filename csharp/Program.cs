@@ -73,27 +73,26 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts, Dictionary<string, int[]
 
             taggedPostCount[postIndex] = 0; // don't count self
 
-            byte minTags = 0;
+            uint minTags = 0;
 
             var top5 = new (byte Count, int PostId)[topN];
 
             //  custom priority queue to find top N
             for (var j = 0; j < taggedPostCount.Length; j++)
             {
-                byte count = taggedPostCount[j];
+                uint count = taggedPostCount[j];
 
                 if (count > minTags)
                 {
                     int upperBound = topN - 2;
 
-                    while (count > top5[upperBound].Count)
+                    while (upperBound >= 0 && count > top5[upperBound].Count)
                     {
                         top5[upperBound + 1] = top5[upperBound];
-                        if (upperBound-- == 0)
-                            break;
+                        upperBound--;
                     }
 
-                    top5[upperBound + 1] = (count, j);
+                    top5[upperBound + 1] = ((byte)count, j);
 
                     minTags = top5[topN - 1].Count;
                 }
