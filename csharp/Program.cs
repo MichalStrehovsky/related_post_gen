@@ -7,12 +7,10 @@ using System.Text.Json.Serialization;
 const int topN = 5;
 var posts = JsonSerializer.Deserialize(File.ReadAllText(@"../posts.json"), MyJsonContext.Default.ListPost)!;
 
-// slower when warm up manually
-// GetRelatedPosts(posts);
-
 var sw = Stopwatch.StartNew();
 
-var allRelatedPosts = GetRelatedPosts(posts);
+var tagMap = BuildTagMap(posts);
+var allRelatedPosts = GetRelatedPosts(posts, tagMap);
 
 sw.Stop();
 
@@ -20,15 +18,12 @@ Console.WriteLine($"Processing time (w/o IO): {sw.Elapsed.TotalMilliseconds}ms")
 
 File.WriteAllText(@"../related_posts_csharp.json", JsonSerializer.Serialize(allRelatedPosts, MyJsonContext.Default.RelatedPostsArray));
 
-
-static RelatedPosts[] GetRelatedPosts(List<Post> posts)
+static Dictionary<string, int[]> BuildTagMap(List<Post> posts)
 {
-    var postsCount = posts.Count;
-
     // Create a dictionary to map tags to post IDs.
     var tagMapTemp = new Dictionary<string, LinkedList<int>>(100);
 
-    for (var i = 0; i < postsCount; i++)
+    for (var i = 0; i < posts.Count; i++)
     {
         foreach (var tag in posts[i].Tags)
         {
@@ -46,17 +41,21 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
         tagMap[tag] = postIds.ToArray();
     }
 
+    return tagMap;
+}
+
+static RelatedPosts[] GetRelatedPosts(List<Post> posts, Dictionary<string, int[]> tagMap)
+{
     // Create an array to store all of the related posts.
-    var allRelatedPosts = new RelatedPosts[postsCount];
-    var taggedPostCount = new byte[postsCount];
-    var top5 = new (byte Count, int PostId)[topN];
+    var allRelatedPosts = new RelatedPosts[posts.Count];
+    var taggedPostCount = new byte[posts.Count];
 
     // Iterate over all of the posts.
-    for (var i = 0; i < postsCount; i++)
+    for (var i = 0; i < allRelatedPosts.Length; i++)
     {
-        allRelatedPosts[i] = GetRelatedPosts(i, taggedPostCount, posts, tagMap, top5);
+        allRelatedPosts[i] = GetRelatedPosts(i, taggedPostCount, posts, tagMap);
 
-        static RelatedPosts GetRelatedPosts(int postIndex, byte[] taggedPostCount, List<Post> posts, Dictionary<string, int[]> tagMap, (byte Count, int PostId)[] top5)
+        static RelatedPosts GetRelatedPosts(int postIndex, byte[] taggedPostCount, List<Post> posts, Dictionary<string, int[]> tagMap)
         {
             // Reset the tagged post counts.
             ((Span<byte>)taggedPostCount).Fill(0);
@@ -73,8 +72,10 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
             }
 
             taggedPostCount[postIndex] = 0; // don't count self
-            ((Span<(byte, int)>)top5).Clear();
+
             byte minTags = 0;
+
+            var top5 = new (byte Count, int PostId)[topN];
 
             //  custom priority queue to find top N
             for (var j = 0; j < taggedPostCount.Length; j++)
@@ -89,7 +90,7 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
                     {
                         top5[upperBound + 1] = top5[upperBound];
                         if (upperBound-- == 0)
-                            break; ;
+                            break;
                     }
 
                     top5[upperBound + 1] = (count, j);
