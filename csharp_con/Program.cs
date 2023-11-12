@@ -28,7 +28,7 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
     var postsCount = posts.Count;
 
     // Create a dictionary to map tags to post IDs.
-    var tagMapTemp = new Dictionary<string, LinkedList<int>>(100);
+    var tagMapTemp = new Dictionary<string, LinkedList<int>>(100, new FxHashStringEqualityComparer());
 
     for (var i = 0; i < postsCount; i++)
     {
@@ -43,7 +43,8 @@ static RelatedPosts[] GetRelatedPosts(List<Post> posts)
 
     var tagMap = tagMapTemp.ToFrozenDictionary(
         s => s.Key,
-        s => s.Value.ToArray());
+        s => s.Value.ToArray(),
+        new FxHashStringEqualityComparer());
 
     // Create an array to store all of the related posts.
     var allRelatedPosts = new RelatedPosts[postsCount];
